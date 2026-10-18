@@ -27,6 +27,8 @@ func writeError(w http.ResponseWriter, err error) {
 		status = http.StatusUnauthorized
 	case errors.Is(err, domain.ErrSeatUnavailable):
 		status = http.StatusConflict
+	case errors.Is(err, domain.ErrHoldExpired):
+		status = http.StatusGone
 	}
 
 	msg := err.Error()

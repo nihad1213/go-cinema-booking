@@ -10,8 +10,11 @@ import (
 	"cinema-booking/internal/repository"
 )
 
+const confirmGrace = 30 * time.Second
+
 type BookingService struct {
 	showtimes repository.ShowtimeRepository
+	bookings  repository.BookingRepository
 	holds     repository.SeatHoldStore
 	holdTTL   time.Duration
 	maxSeats  int
@@ -19,12 +22,14 @@ type BookingService struct {
 
 func NewBookingService(
 	showtimes repository.ShowtimeRepository,
+	bookings repository.BookingRepository,
 	holds repository.SeatHoldStore,
 	holdTTL time.Duration,
 	maxSeats int,
 ) *BookingService {
 	return &BookingService{
 		showtimes: showtimes,
+		bookings:  bookings,
 		holds:     holds,
 		holdTTL:   holdTTL,
 		maxSeats:  maxSeats,
@@ -96,6 +101,43 @@ func (s *BookingService) ReleaseSeats(ctx context.Context, showtimeID int64, use
 		return err
 	}
 	return s.holds.Release(ctx, showtimeID, seatIDs, userID)
+}
+
+func (s *BookingService) ConfirmBooking(ctx context.Context, showtimeID int64, userID string, seatIDs []int64) (*domain.Booking, error) {
+	seatIDs, err := s.normalize(seatIDs)
+	if err != nil {
+		return nil, err
+	}
+	st, err := s.showtimes.Get(ctx, showtimeID)
+	if err != nil {
+		return nil, err
+	}
+
+	ok, err := s.holds.Verify(ctx, showtimeID, seatIDs, userID, confirmGrace)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, domain.ErrHoldExpired
+	}
+
+	booking := &domain.Booking{
+		UserID:     userID,
+		ShowtimeID: showtimeID,
+		SeatIDs:    seatIDs,
+		TotalCents: st.PriceCents * int64(len(seatIDs)),
+	}
+	if err := s.bookings.CreateConfirmed(ctx, booking); err != nil {
+		return nil, err
+	}
+
+	_ = s.holds.Release(ctx, showtimeID, seatIDs, userID)
+
+	return booking, nil
+}
+
+func (s *BookingService) GetBooking(ctx context.Context, id int64) (*domain.Booking, error) {
+	return s.bookings.Get(ctx, id)
 }
 
 func (s *BookingService) normalize(ids []int64) ([]int64, error) {

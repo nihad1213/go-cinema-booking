@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seat holds, live</title>
+<style>
+:root{
+  --bg:#eef0f4; --panel:#ffffff; --ink:#1b2233; --muted:#5d667a; --line:#d5dae5;
+  --free:#c7d2ea; --other:#e8a93a; --mine:#2f8f7b; --booked:#7a2e3a; --sel:#2b59ff;
+  --ok:#1f7a4d; --warn:#b4540a; --bad:#a3262f;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12151d; --panel:#1b2030; --ink:#e8ebf3; --muted:#9aa3b8; --line:#2e3550;
+    --free:#38425f; --other:#d99a2b; --mine:#3aa58f; --booked:#9c3a49; --sel:#7b9bff;
+    --ok:#5fcf9a; --warn:#f0a35a; --bad:#ff8a92;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;padding:clamp(16px,4vw,40px);color:var(--ink);background:var(--bg);
+  font:16px/1.5 "Avenir Next","Segoe UI",system-ui,sans-serif;max-width:1100px;margin-inline:auto}
+h1{font-size:clamp(28px,5vw,40px);line-height:1.1;margin:0 0 6px;letter-spacing:-.02em}
+h2{font-size:18px;margin:0 0 10px}
+.lead{color:var(--muted);margin:0 0 18px;max-width:62ch}
+.bar{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;margin-bottom:22px;font-size:14px;color:var(--muted)}
+.bar input{width:56px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--muted);margin-right:6px}
+.dot.on{background:var(--ok)} .dot.off{background:var(--bad)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:14px;border-radius:5px 5px 2px 2px;display:inline-block}
+.sw.free{background:var(--free)} .sw.sel{background:var(--free);outline:2px solid var(--sel)}
+.sw.mine{background:var(--mine)} .sw.other{background:var(--other)} .sw.booked{background:var(--booked)}
+
+#panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.panel h2{display:flex;justify-content:space-between;align-items:baseline;text-transform:capitalize}
+.panel h2 small{font-size:13px;font-weight:400;color:var(--muted);text-transform:none}
+.screen{height:10px;margin:8px 8% 18px;border-top:4px solid var(--ink);border-radius:50% 50% 0 0/100% 100% 0 0;opacity:.55}
+.row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.row b{width:16px;font-size:13px;color:var(--muted);font-weight:600}
+.seats{display:flex;gap:6px;flex-wrap:nowrap}
+.seat{width:clamp(28px,8vw,36px);height:clamp(28px,8vw,36px);border:0;border-radius:10px 10px 4px 4px;
+  font:600 11px/1 inherit;color:var(--ink);background:var(--free);cursor:pointer;padding:0}
+.seat.mine{background:var(--mine);color:#fff;cursor:default}
+.seat.other{background:var(--other);color:#1b2233}
+.seat.booked{background:var(--booked);color:#fff;cursor:not-allowed}
+.seat.sel{outline:3px solid var(--sel);outline-offset:1px}
+.seat:focus-visible{outline:3px solid var(--sel);outline-offset:2px}
+.status{min-height:24px;margin:14px 0 10px;font-size:14px}
+.status .time{font-variant-numeric:tabular-nums;font-weight:700}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+button.act{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:600 14px inherit;cursor:pointer}
+button.act.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button.act:disabled{opacity:.4;cursor:not-allowed}
+button.act:focus-visible{outline:3px solid var(--sel);outline-offset:2px}
+
+#log{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+#log li{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px}
+#log .top{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
+#log code{font:13px ui-monospace,Menlo,Consolas,monospace}
+#log .chip{font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid currentColor}
+#log .s2{color:var(--ok)} #log .s4{color:var(--warn)} #log .s5,#log .s0{color:var(--bad)}
+#log .hint{color:var(--muted);margin-top:4px}
+#log .empty{color:var(--muted);border-style:dashed}
+section{margin-top:28px}
+@media (prefers-reduced-motion:no-preference){.seat{transition:background .25s}}
+</style>
+</head>
+<body>
+<h1>Seat holds, live</h1>
+<p class="lead">Alice and Bob look at the same auditorium. Hold seats as one of them, then switch to the other and try to take the same ones. Every request and the server's answer appear in the log.</p>
+
+<div class="bar">
+  <label>Showtime ID <input id="showtime" type="number" min="1" value="1"></label>
+  <span><span class="dot" id="dot"></span><span id="conn">Connecting…</span></span>
+  <span class="legend">
+    <span><i class="sw free"></i>Available</span>
+    <span><i class="sw sel"></i>Selected</span>
+    <span><i class="sw mine"></i>Held by you</span>
+    <span><i class="sw other"></i>Held by someone else</span>
+    <span><i class="sw booked"></i>Booked</span>
+  </span>
+</div>
+
+<div id="panels"></div>
+
+<section>
+  <h2>What the server said</h2>
+  <ol id="log"><li class="empty">Nothing yet. Select a seat and press Hold seats.</li></ol>
+</section>
+
+<script>
+const USERS = ['alice', 'bob'];
+const BASE = '';            // empty = same origin (page served by the Go app)
+const state = {};
+const $ = (s, el = document) => el.querySelector(s);
+const showtimeId = () => Number($('#showtime').value) || 1;
+
+const HINTS = {
+  200: 'Done.', 201: 'Booked.', 204: 'Released.',
+  401: 'The server needs the X-User-ID header.',
+  404: 'Not found. For Confirm this means the endpoint does not exist yet (Step 6).',
+  405: 'Method not allowed. For Confirm this means the endpoint does not exist yet (Step 6).',
+  409: 'Another user holds one of these seats. Nothing was held, not even the free ones.',
+  410: 'The hold expired before it was confirmed.',
+  0: 'Could not reach the server. Open this page at http://localhost:8080 and check that the Go app is running.'
+};
+
+async function call(user, method, path, body) {
+  let status = 0, data = null;
+  try {
+    const res = await fetch(BASE + path, {
+      method,
+      headers: { 'X-User-ID': user, 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    status = res.status;
+    const text = await res.text();
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  } catch (e) { data = { error: String(e) }; }
+  return { status, data };
+}
+
+function addLog(user, method, path, body, res) {
+  const log = $('#log');
+  if (log.firstElementChild && log.firstElementChild.classList.contains('empty')) log.innerHTML = '';
+  const li = document.createElement('li');
+  const top = document.createElement('div'); top.className = 'top';
+  const chip = document.createElement('span');
+  chip.className = 'chip s' + String(res.status)[0];
+  chip.textContent = res.status || 'no response';
+  const who = document.createElement('b'); who.textContent = user;
+  const code = document.createElement('code');
+  code.textContent = method + ' ' + path + (body ? ' ' + JSON.stringify(body) : '');
+  const time = document.createElement('span');
+  time.style.color = 'var(--muted)'; time.textContent = new Date().toLocaleTimeString();
+  top.append(chip, who, code, time);
+  const hint = document.createElement('div'); hint.className = 'hint';
+  const err = res.data && res.data.error ? ' Server: "' + res.data.error + '".' : '';
+  hint.textContent = (HINTS[res.status] || '') + err;
+  li.append(top, hint);
+  log.prepend(li);
+  while (log.children.length > 25) log.lastElementChild.remove();
+}
+
+// ---------- panels ----------
+function buildPanels() {
+  const wrap = $('#panels');
+  for (const u of USERS) {
+    state[u] = { seats: [], selected: new Set(), expires: null, btns: new Map(), built: false };
+    const p = document.createElement('div');
+    p.className = 'panel'; p.id = 'p-' + u;
+    p.innerHTML =
+      '<h2>' + u + '<small>X-User-ID: ' + u + '</small></h2>' +
+      '<div class="screen" aria-hidden="true"></div>' +
+      '<div class="grid"></div>' +
+      '<div class="status" aria-live="polite"></div>' +
+      '<div class="actions">' +
+        '<button class="act primary" data-a="hold">Hold seats</button>' +
+        '<button class="act" data-a="confirm">Confirm booking</button>' +
+        '<button class="act" data-a="release">Release</button>' +
+      '</div>';
+    p.addEventListener('click', e => {
+      const b = e.target.closest('button.act');
+      if (b) ({ hold, confirm: confirmBooking, release })[b.dataset.a](u);
+    });
+    wrap.append(p);
+  }
+}
+
+function mine(u) { return state[u].seats.filter(s => s.status === 'pending' && s.mine); }
+
+function renderSeats(u) {
+  const st = state[u], grid = $('#p-' + u + ' .grid');
+  if (!st.built || st.btns.size !== st.seats.length) {
+    grid.innerHTML = ''; st.btns.clear();
+    const rows = {};
+    for (const s of st.seats) (rows[s.label[0]] ||= []).push(s);
+    for (const [letter, seats] of Object.entries(rows)) {
+      const r = document.createElement('div'); r.className = 'row';
+      r.innerHTML = '<b>' + letter + '</b><div class="seats"></div>';
+      for (const s of seats) {
+        const b = document.createElement('button');
+        b.className = 'seat'; b.textContent = s.label.slice(1);
+        b.addEventListener('click', () => toggle(u, b.dataset.id));
+        b.dataset.id = s.id;
+        st.btns.set(s.id, b); $('.seats', r).append(b);
+      }
+      grid.append(r);
+    }
+    st.built = true;
+  }
+  for (const s of st.seats) {
+    const b = st.btns.get(s.id);
+    if (s.status === 'booked' || s.mine) st.selected.delete(s.id);
+    const cls = s.status === 'booked' ? 'booked' : s.status === 'pending' ? (s.mine ? 'mine' : 'other') : '';
+    b.className = 'seat ' + cls + (st.selected.has(s.id) ? ' sel' : '');
+    b.setAttribute('aria-pressed', st.selected.has(s.id));
+    b.setAttribute('aria-label', s.label + ', ' + (s.mine ? 'held by you' : s.status));
+    b.title = s.label + ' · ' + (s.mine ? 'held by you' : s.status === 'pending' ? 'held by someone else (try it anyway)' : s.status);
+  }
+  const m = mine(u);
+  const panel = $('#p-' + u);
+  $('[data-a=hold]', panel).disabled = st.selected.size === 0;
+  $('[data-a=confirm]', panel).disabled = m.length === 0;
+  $('[data-a=release]', panel).disabled = m.length === 0;
+  renderStatus(u);
+}
+
+function renderStatus(u) {
+  const st = state[u], el = $('#p-' + u + ' .status'), m = mine(u);
+  if (st.note) { el.textContent = st.note; return; }
+  if (m.length) {
+    const left = st.expires ? Math.max(0, Math.ceil((st.expires - Date.now()) / 1000)) : null;
+    const t = left === null ? '' : ' · <span class="time">' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') + '</span> left';
+    el.innerHTML = 'Holding ' + m.map(s => s.label).join(', ') + t;
+  } else if (st.selected.size) {
+    el.textContent = st.selected.size + ' seat(s) selected. Press Hold seats.';
+  } else {
+    el.textContent = 'Pick one or more seats.';
+  }
+}
+
+function toggle(u, idStr) {
+  const st = state[u], id = Number(idStr);
+  const s = st.seats.find(x => x.id === id);
+  if (!s || s.status === 'booked' || s.mine) return;
+  st.note = '';
+  st.selected.has(id) ? st.selected.delete(id) : st.selected.add(id);
+  renderSeats(u);
+}
+
+// ---------- actions ----------
+async function hold(u) {
+  const st = state[u], ids = [...st.selected];
+  const path = `/api/showtimes/${showtimeId()}/hold`, body = { seat_ids: ids };
+  const res = await call(u, 'POST', path, body);
+  addLog(u, 'POST', path, body, res);
+  if (res.status === 200) { st.expires = Date.parse(res.data.expires_at); st.selected.clear(); st.note = ''; }
+  else st.note = res.status === 409 ? 'Hold refused: a seat is taken. Your selection is kept.' : 'Hold failed. See the log.';
+  await refreshAll();
+}
+async function release(u) {
+  const ids = mine(u).map(s => s.id);
+  const path = `/api/showtimes/${showtimeId()}/hold`, body = { seat_ids: ids };
+  const res = await call(u, 'DELETE', path, body);
+  addLog(u, 'DELETE', path, body, res);
+  state[u].note = ''; state[u].expires = null;
+  await refreshAll();
+}
+async function confirmBooking(u) {
+  const ids = mine(u).map(s => s.id);
+  const path = `/api/showtimes/${showtimeId()}/confirm`, body = { seat_ids: ids };
+  const res = await call(u, 'POST', path, body);
+  addLog(u, 'POST', path, body, res);
+  state[u].note = res.status === 201 ? 'Booked. Booking #' + res.data.id + '.' : 'Confirm failed. See the log.';
+  if (res.status === 201) state[u].expires = null;
+  await refreshAll();
+}
+
+// ---------- polling ----------
+async function refreshAll() {
+  const results = await Promise.all(USERS.map(u => call(u, 'GET', `/api/showtimes/${showtimeId()}/seats`)));
+  const ok = results.every(r => r.status === 200 && Array.isArray(r.data));
+  $('#dot').className = 'dot ' + (ok ? 'on' : 'off');
+  $('#conn').textContent = ok ? 'Live, refreshing every second' : 'Cannot load seats (HTTP ' + (results.find(r => r.status !== 200)?.status || 0) + ')';
+  if (!ok) return;
+  USERS.forEach((u, i) => {
+    const prev = state[u].seats.length;
+    state[u].seats = results[i].data;
+    if (!mine(u).length) state[u].expires = null;
+    renderSeats(u);
+  });
+}
+
+buildPanels();
+$('#showtime').addEventListener('change', () => { USERS.forEach(u => { state[u].selected.clear(); state[u].built = false; }); refreshAll(); });
+refreshAll();
+setInterval(refreshAll, 1000);
+setInterval(() => USERS.forEach(renderStatus), 250);
+</script>
+</body>
+</html>

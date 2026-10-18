@@ -47,14 +47,16 @@ func main() {
 	defer rdb.Close()
 
 	showtimeRepo := sqlite.NewShowtimeRepo(db)
+	bookingRepo := sqlite.NewBookingRepo(db)
 	holdStore := rediscache.NewSeatHoldStore(rdb)
 
 	showtimeSvc := service.NewShowtimeService(showtimeRepo)
-	bookingSvc := service.NewBookingService(showtimeRepo, holdStore, cfg.HoldTTL, cfg.MaxSeats)
+	bookingSvc := service.NewBookingService(showtimeRepo, bookingRepo, holdStore, cfg.HoldTTL, cfg.MaxSeats)
 
 	showtimeHandler := handler.NewShowtimeHandler(showtimeSvc)
 	bookingHandler := handler.NewBookingHandler(bookingSvc)
 
+	// --- HTTP server ---
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           handler.NewRouter(showtimeHandler, bookingHandler),

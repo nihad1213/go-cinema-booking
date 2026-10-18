@@ -87,3 +87,41 @@ func (h *BookingHandler) Release(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *BookingHandler) Confirm(w http.ResponseWriter, r *http.Request) {
+	user, err := requireUser(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	id, err := pathID(r, "id")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	seats, err := decodeSeats(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	booking, err := h.svc.ConfirmBooking(r.Context(), id, user, seats)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, booking)
+}
+
+func (h *BookingHandler) GetBooking(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	booking, err := h.svc.GetBooking(r.Context(), id)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, booking)
+}

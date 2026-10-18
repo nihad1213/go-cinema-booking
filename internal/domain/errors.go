@@ -7,4 +7,5 @@ var (
 	ErrInvalidInput    = errors.New("invalid input")
 	ErrUnauthorized    = errors.New("missing X-User-ID header")
 	ErrSeatUnavailable = errors.New("one or more seats are not available")
+	ErrHoldExpired     = errors.New("seat hold expired or does not belong to you")
 )

@@ -41,12 +41,23 @@ end
 return 1
 `)
 
-
 var releaseScript = redis.NewScript(`
 for i = 1, #KEYS do
   if redis.call('GET', KEYS[i]) == ARGV[1] then
     redis.call('DEL', KEYS[i])
   end
+end
+return 1
+`)
+
+var verifyScript = redis.NewScript(`
+for i = 1, #KEYS do
+  if redis.call('GET', KEYS[i]) ~= ARGV[1] then
+    return 0
+  end
+end
+for i = 1, #KEYS do
+  redis.call('PEXPIRE', KEYS[i], ARGV[2])
 end
 return 1
 `)
@@ -64,6 +75,14 @@ func (s *SeatHoldStore) Hold(ctx context.Context, showtimeID int64, seatIDs []in
 
 func (s *SeatHoldStore) Release(ctx context.Context, showtimeID int64, seatIDs []int64, userID string) error {
 	return releaseScript.Run(ctx, s.rdb, keys(showtimeID, seatIDs), userID).Err()
+}
+
+func (s *SeatHoldStore) Verify(ctx context.Context, showtimeID int64, seatIDs []int64, userID string, extend time.Duration) (bool, error) {
+	n, err := verifyScript.Run(ctx, s.rdb, keys(showtimeID, seatIDs), userID, extend.Milliseconds()).Int()
+	if err != nil {
+		return false, err
+	}
+	return n == 1, nil
 }
 
 func (s *SeatHoldStore) Holds(ctx context.Context, showtimeID int64, seatIDs []int64) (map[int64]string, error) {
