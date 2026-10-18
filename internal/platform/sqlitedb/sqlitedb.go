@@ -38,6 +38,7 @@ func Migrate(ctx context.Context, db *sql.DB, files fs.FS) error {
 		return err
 	}
 	sort.Strings(names)
+	fmt.Println("migration files found:", names)
 
 	for _, name := range names {
 		var done int
@@ -46,7 +47,7 @@ func Migrate(ctx context.Context, db *sql.DB, files fs.FS) error {
 			return err
 		}
 		if done > 0 {
-			continue // already applied
+			continue
 		}
 
 		body, err := fs.ReadFile(files, name)
