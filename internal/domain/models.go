@@ -14,6 +14,13 @@ type SeatView struct {
 	ID     int64      `json:"id"`
 	Label  string     `json:"label"`
 	Status SeatStatus `json:"status"`
+	Mine   bool       `json:"mine"`
+}
+
+type HoldResult struct {
+	ShowtimeID int64     `json:"showtime_id"`
+	SeatIDs    []int64   `json:"seat_ids"`
+	ExpiresAt  time.Time `json:"expires_at"`
 }
 
 type Showtime struct {

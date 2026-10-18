@@ -23,6 +23,10 @@ func writeError(w http.ResponseWriter, err error) {
 		status = http.StatusNotFound
 	case errors.Is(err, domain.ErrInvalidInput):
 		status = http.StatusBadRequest
+	case errors.Is(err, domain.ErrUnauthorized):
+		status = http.StatusUnauthorized
+	case errors.Is(err, domain.ErrSeatUnavailable):
+		status = http.StatusConflict
 	}
 
 	msg := err.Error()

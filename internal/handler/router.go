@@ -12,6 +12,8 @@ func NewRouter(showtimes *ShowtimeHandler, bookings *BookingHandler) http.Handle
 	mux.HandleFunc("GET /api/showtimes", showtimes.List)
 	mux.HandleFunc("GET /api/showtimes/{id}", showtimes.Get)
 	mux.HandleFunc("GET /api/showtimes/{id}/seats", bookings.SeatMap)
+	mux.HandleFunc("POST /api/showtimes/{id}/hold", bookings.Hold)
+	mux.HandleFunc("DELETE /api/showtimes/{id}/hold", bookings.Release)
 
-	return mux
+	return UserID(mux)
 }
