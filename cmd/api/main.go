@@ -39,12 +39,16 @@ func main() {
 	}
 
 	showtimeRepo := sqlite.NewShowtimeRepo(db)
+
 	showtimeSvc := service.NewShowtimeService(showtimeRepo)
+	bookingSvc := service.NewBookingService(showtimeRepo)
+
 	showtimeHandler := handler.NewShowtimeHandler(showtimeSvc)
+	bookingHandler := handler.NewBookingHandler(bookingSvc)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           handler.NewRouter(showtimeHandler),
+		Handler:           handler.NewRouter(showtimeHandler, bookingHandler),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

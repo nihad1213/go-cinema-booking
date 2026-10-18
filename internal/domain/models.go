@@ -2,6 +2,20 @@ package domain
 
 import "time"
 
+type SeatStatus string
+
+const (
+	SeatAvailable SeatStatus = "available"
+	SeatPending   SeatStatus = "pending"
+	SeatBooked    SeatStatus = "booked"
+)
+
+type SeatView struct {
+	ID     int64      `json:"id"`
+	Label  string     `json:"label"`
+	Status SeatStatus `json:"status"`
+}
+
 type Showtime struct {
 	ID         int64     `json:"id"`
 	MovieID    int64     `json:"movie_id"`

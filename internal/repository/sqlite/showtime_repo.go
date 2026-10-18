@@ -55,3 +55,43 @@ func (r *ShowtimeRepo) Get(ctx context.Context, id int64) (*domain.Showtime, err
 	}
 	return st, err
 }
+
+func (r *ShowtimeRepo) SeatsByHall(ctx context.Context, hallID int64) ([]domain.Seat, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, hall_id, row_label, number
+		 FROM seats WHERE hall_id = ?
+		 ORDER BY row_label, number`, hallID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []domain.Seat{}
+	for rows.Next() {
+		var s domain.Seat
+		if err := rows.Scan(&s.ID, &s.HallID, &s.Row, &s.Number); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+func (r *ShowtimeRepo) BookedSeatIDs(ctx context.Context, showtimeID int64) (map[int64]bool, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT seat_id FROM booking_seats WHERE showtime_id = ?`, showtimeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[int64]bool)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
