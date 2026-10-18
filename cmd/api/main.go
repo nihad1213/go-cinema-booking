@@ -12,7 +12,10 @@ import (
 	"time"
 
 	"cinema-booking/internal/config"
+	"cinema-booking/internal/handler"
 	"cinema-booking/internal/platform/sqlitedb"
+	"cinema-booking/internal/repository/sqlite"
+	"cinema-booking/internal/service"
 	"cinema-booking/migrations"
 )
 
@@ -35,20 +38,13 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	var seats int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM seats`).Scan(&seats); err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("database ready, seats in DB: %d", seats)
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("ok"))
-	})
+	showtimeRepo := sqlite.NewShowtimeRepo(db)
+	showtimeSvc := service.NewShowtimeService(showtimeRepo)
+	showtimeHandler := handler.NewShowtimeHandler(showtimeSvc)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           mux,
+		Handler:           handler.NewRouter(showtimeHandler),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
